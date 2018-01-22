@@ -1,8 +1,7 @@
 (ns qlkit.qlkit-test
   (:refer-clojure :rename {read core-read sync core-sync})
   (:require [clojure.test :refer [deftest is]]
-            [qlkit.core :as ql]
-            [fbc-utils.debug :refer [??]]))
+            [qlkit.core :as ql]))
 
 (deftest actualize-test []
   ;;non-sequences evaluate to themselves
