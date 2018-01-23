@@ -53,6 +53,7 @@
     :i
     :iframe
     :img
+    :input
     :ins
     :kbd
     :keygen
