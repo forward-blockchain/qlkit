@@ -50,12 +50,14 @@
                 [:bar!])
     (is (= @x 1)))
   ;;If no parser is provided, an error is thrown
-  (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                        #"no parser for :foo"
+  (is (thrown-with-msg? java.lang.IllegalArgumentException
+                        #"No method in multimethod"
                         (parse-with (fn [])
                                     [:foo])))
   ;;If there's a remote parser, it's OK to not have other parsers
   (is (nil? (parse-with (fn []
+                          ;; if there is a reader we must handle default
+                          (defmethod read :default [a b c])
                           (defmethod remote :foo
                             [query-term state]
                             33))
@@ -172,7 +174,9 @@
                             [[:foo]])
          [[:foo {}]]))
   ;;If there are no remotes, we just get an empty seq
-  (is (= (parse-remote-with (fn [])
+  (is (= (parse-remote-with (fn []
+                              ;; must have a default handler in the nil case at least
+                              (defmethod remote :default [a b]))
                             [[:foo]])
          ()))
   ;;We can parse child queries when parsing a remote query, and parsing functions can modify the query
@@ -204,13 +208,15 @@
                      42)
     (is (= @state 42))
     ;;If a read query is missing a sync, an error is thrown
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                          #"Missing sync parser for :foo"
+    (is (thrown-with-msg? java.lang.IllegalArgumentException
+                          #"No method in multimethod"
                           (parse-sync-with (fn [])
                                            [:foo {}]
                                            42)))
     ;;Remote mutations are permitted without a sync parser
-    (parse-sync-with (fn [])
+    (parse-sync-with (fn []
+                       ;; a default method is required
+                       (defmethod sync :default [a b c d]))
                      [:foo! {}]
                      42)
     ;;Here we are calling child sync functions recursively. Note that lasy seqs will be immediately be made un-lazy by qlkit.

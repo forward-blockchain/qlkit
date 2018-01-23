@@ -32,34 +32,20 @@
     (doall x)
     x))
 
-(defn get-fn [f & args]
-  (if (instance? #?(:cljs MultiFn
-                    :clj clojure.lang.MultiFn)
-                 f)
-    (->> (apply (let [v #?(:cljs (.-dispatch-fn f)
-                           :clj (.-dispatchFn f))]
-                  v)
-                args)
-         (get-method f))
-    f))
+(declare mutation-query-term?)
 
 (defn- parse-query-term [query-term env]
   "Parses a single query term, i.e. something in the form [:person {} [:person/name] [:person/age]]. The environment is used to pass info from parent queries down to child queries."
   (let [{:keys [state parsers]}      @mount-info
-        {:keys [read remote mutate]} parsers
-        key                          (first query-term)
-        read-fun                     (get-fn read query-term env (when state @state))
-        mutate-fun                   (get-fn mutate query-term env state)
-        remote-fun                   (when remote
-                                       (get-fn remote query-term state))]
-    (when (not (or read-fun remote-fun mutate-fun))
-      (throw (ex-info (str "no parser for " key) {})))
-    (actualize (cond mutate-fun (if state
-                                  (mutate-fun query-term env state)
-                                  (mutate-fun query-term env))
-                     read-fun   (if state
-                                  (read-fun query-term env @state)
-                                  (read-fun query-term env))
+        {:keys [read mutate]} parsers]
+    (actualize (cond (and (mutation-query-term? query-term) mutate)
+                     (if state
+                       (mutate query-term env state)
+                       (mutate query-term env))
+                     read
+                     (if state
+                       (read query-term env @state)
+                       (read query-term env))
                      :else      nil))))
 
 (defn parse-query
@@ -172,11 +158,11 @@
   "This parses a query and sends off its parts to any 'remote' query handlers. Returns another query (the query to send to the server) as a result."
   (normalize-query (reduce (fn [acc item]
                              (let [{:keys [state parsers]} @mount-info
-                                   {:keys [remote]}        parsers
-                                   key                     (first item)
-                                   remote-fun              (get-fn remote item (when state @state))]
-                               (if remote-fun
-                                 (conj acc (remote-fun item (when state @state)))
+                                   {:keys [remote]}        parsers]
+                               (if remote
+                                 (if-let [v (remote item (when state @state))]
+                                   (conj acc v)
+                                   acc)
                                  acc)))
                            []
                            query)))
@@ -189,10 +175,10 @@
 
 (defn- parse-query-term-sync [[key :as query-term] result env]
   "Calls the sync parsers for a query term, which are responsible for merging server results into the client state."
-  (let [sync-fun (get-fn (:sync (:parsers @mount-info)) query-term result env (:state @mount-info))]
-    (cond sync-fun                          (actualize (sync-fun query-term result env (:state @mount-info)))
-          (mutation-query-term? query-term) nil
-          :else                             (throw (ex-info (str "Missing sync parser for " key) {})))))
+  (when-let [sync-fun (:sync (:parsers @mount-info))]
+    (actualize (sync-fun query-term result env (:state @mount-info)))
+    #_(or (mutation-query-term? query-term)
+          (throw (ex-info (str "Missing sync parser for " key) {})))))
 
 (defn parse-children-sync [query-term result env]
   "This function can be called from sync parsers to recursively perform child sync queries."
