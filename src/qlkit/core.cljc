@@ -32,23 +32,34 @@
     (doall x)
     x))
 
+(defn get-fn [f & args]
+  (if (instance? #?(:cljs MultiFn
+                    :clj clojure.lang.MultiFn)
+                 f)
+    (->> (apply (let [v #?(:cljs (.-dispatch-fn f)
+                           :clj (.-dispatchFn f))]
+                  v)
+                args)
+         (get-method f))
+    f))
+
 (defn- parse-query-term [query-term env]
   "Parses a single query term, i.e. something in the form [:person {} [:person/name] [:person/age]]. The environment is used to pass info from parent queries down to child queries."
   (let [{:keys [state parsers]}      @mount-info
         {:keys [read remote mutate]} parsers
         key                          (first query-term)
-        read-fun                     (get-method read key)
-        mutate-fun                   (get-method mutate key)
+        read-fun                     (get-fn read query-term env @state)
+        mutate-fun                   (get-fn mutate query-term env state)
         remote-fun                   (when remote
-                                       (get-method remote key))]
+                                       (get-fn remote query-term state))]
     (when (not (or read-fun remote-fun mutate-fun))
       (throw (ex-info (str "no parser for " key) {})))
     (actualize (cond mutate-fun (if state
                                   (mutate-fun query-term env state)
-                                  (mutate-fun query-term env))
+                                  (mutate-fun query-term env nil))
                      read-fun   (if state
                                   (read-fun query-term env @state)
-                                  (read-fun query-term env))
+                                  (read-fun query-term env nil))
                      :else      nil))))
 
 (defn parse-query
@@ -163,7 +174,7 @@
                              (let [{:keys [state parsers]} @mount-info
                                    {:keys [remote]}        parsers
                                    key                     (first item)
-                                   remote-fun              (get-method remote key)]
+                                   remote-fun              (get-fn remote item @state)]
                                (if remote-fun
                                  (conj acc (remote-fun item @state))
                                  acc)))
@@ -178,7 +189,7 @@
 
 (defn- parse-query-term-sync [[key :as query-term] result env]
   "Calls the sync parsers for a query term, which are responsible for merging server results into the client state."
-  (let [sync-fun (get-method (:sync (:parsers @mount-info)) key)]
+  (let [sync-fun (get-fn (:sync (:parsers @mount-info)) query-term result env (:state @mount-info))]
     (cond sync-fun                          (actualize (sync-fun query-term result env (:state @mount-info)))
           (mutation-query-term? query-term) nil
           :else                             (throw (ex-info (str "Missing sync parser for " key) {})))))
@@ -227,8 +238,10 @@
 
 (defn mount [args]
   "This is used to mount qlkit tied to a dom element (or without a dom element, when used on the server.) The args map can contain :parsers (the map of parsers) :component (The name of the root qlkit component) :state (a state atom) and :remote-handler (function to call for sending out changes to the server). Only one mount can be set up on the client, and one on the server."
-  (reset! mount-info args)
-  (refresh true))
+  (assert (map? args) "QlKit needs a Map argument defining the options.")
+  (let [options (merge {:state (atom {})} args)]
+    (reset! mount-info options)
+    (refresh true)))
 
 (defn perform-remote-query [query]
   "This calls the remote handler to process the remote query and offers up a callback that is called when the server has returned the results from the query."

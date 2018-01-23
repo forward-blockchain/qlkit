@@ -15,10 +15,10 @@
     ;;coll is fully evaluated
     (is (= @x 10))))
 
-(defmulti read first)
-(defmulti mutate first)
-(defmulti remote first)
-(defmulti sync first)
+(defmulti read   (fn [a b c]   (first a)))
+(defmulti mutate (fn [a b c]   (first a)))
+(defmulti remote (fn [a b]     (first a)))
+(defmulti sync   (fn [a b c d] (first a)))
 
 (defn parse-with [fun query-term]
   (remove-all-methods read)
@@ -30,19 +30,22 @@
 (deftest parse-query-test []
   (reset! ql/mount-info {:parsers {:read   read
                                    :mutate mutate
-                                   :remote remote}})
+                                   :remote remote}
+                         :state (atom {})})
   ;;a read parser result is returned
   (is (= (parse-with (fn []
                        (defmethod read :foo
-                         [query-term env]
-                         42))
+                         [query-term env state]
+                         42)
+                       
+                       )
                      [:foo])
          42))
   ;;a mutate function returns a result, but also performs mutations
   (let [x (atom 0)]
     (parse-with (fn []
                   (defmethod mutate :bar!
-                    [query-term env]
+                    [query-term env state]
                     (swap! x inc)))
                 [:bar!])
     (is (= @x 1)))
@@ -61,11 +64,11 @@
   (is (= (map #(dissoc % ::ql/env)
               (parse-with (fn []
                             (defmethod read :animals
-                              [query-term env]
+                              [query-term env state]
                               (for [animal-id (range 3)]
                                 (ql/parse-children query-term (assoc env :animal-id animal-id))))
                             (defmethod read :name
-                              [query-term env]
+                              [query-term env state]
                               ({0 :duck 1 :cat 2 :dog} (:animal-id env))))
                           [:animals {} [:name]]))
          [{:name :duck} {:name :cat} {:name :dog}])))
@@ -302,11 +305,11 @@
       [query-term result env state-atom]
       (swap! state-atom assoc :foo result))
     (ql/mount {:remote-handler (fn [query callback]
-                                 (callback [:yup]))
-               :parsers        {:sync sync
-                                :read read
-                                :mutate mutate
-                                :remote remote}
-               :state          state})
+                                  (callback [:yup]))
+                :parsers        {:sync sync
+                                 :read read
+                                 :mutate mutate
+                                 :remote remote}
+                :state          state})
     (ql/transact! [:foo])
     (is (= @state {:foo :yup}))))
