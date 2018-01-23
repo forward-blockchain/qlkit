@@ -87,8 +87,6 @@
 
 (def classes (atom {}))
 
-(def ^:dynamic *this* nil)
-
 (declare react-class)
 
 (defn- splice-in-seqs [coll]
@@ -130,16 +128,6 @@
            (:query class) (update :query normalize-query)
            #?(:cljs true
               :clj false) (assoc ::react-class (react-class class)))))
-
-(defn- fix-event-references [this props]
-  "This function decouples events from using the traditional javascript 'this' context into something that can be managed in a more clojure-y way."
-  (into {}
-        (for [[k v] props]
-          (if (fn? v)
-            [k (fn [& args]
-                 (binding [*this* this]
-                   (apply v args)))]
-            [k v]))))
 
 (defn- fix-classname [props]
   "React doesn't permit the standard html 'class' property, this function reenables it when using qlkit."
@@ -240,10 +228,10 @@
          (parse-query-term-sync k v {}))
        (refresh false)))))
 
-(defn transact! [& query]
+(defn transact! [this & query]
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
-  (let [[env component-query]   (if *this*
-                                  (let [props (.-props *this*)
+  (let [[env component-query]   (if this
+                                  (let [props (.-props this)
                                         env   (aget props "env")
                                         query (aget props "query")]
                                     [env query])
@@ -277,16 +265,6 @@
              "Associate an HTML element keyword with a React component."
              (swap! component-registry assoc k v))
 
-           (declare create-element)
-           
-           (defn- fix-inline-react [this props]
-             "These are idiosyncratic properties that may emit raw react components that need to be created."
-             (cond-> props
-               (contains? props :actions) (update :actions
-                                                  (fn [actions]
-                                                    (apply array (map (partial create-element this) actions))))
-               (contains? props :right-icon) (update :right-icon (partial create-element this))))
-
            (defn- ensure-element-type [typ]
              (or (cond (keyword? typ) (or (@component-registry typ)
                                           (when (dom/valid-dom-elements typ)
@@ -294,29 +272,6 @@
                        (string? typ)  (when (dom/valid-dom-elements (keyword typ))
                                         typ))
                  (throw (ex-info "Not a valid dom element" {:type typ}))))
-
-           (defn- create-element [this el]
-             "This function takes an edn structure describing dom elements and instantiates them with them via React."
-             (if (or (string? el) (number? el))
-               el
-               (let [[typ & more]     el
-                     [props children] (if (map? (first more))
-                                        [(first more) (rest more)]
-                                        [{} more])
-                     children         (vec (map (partial create-element this) (splice-in-seqs children)))]
-                 (if (and (keyword? typ) (namespace typ))
-                   (let [{:keys [::react-class :query] :as class} (@classes typ)]
-                     (apply createElement react-class #js {:atts (dissoc props ::env) :env (::env props) :query query} children))
-                   (apply createElement
-                          (ensure-element-type typ)
-                          (->> props
-                               gather-style-props
-                               (fix-event-references this)
-                               fix-classname
-                               (fix-inline-react this)
-                               camel-case-keys
-                               clj->js)
-                          children)))))
 
            (defn- clj-state [state]
              "Pulls state out of the react component state."
@@ -342,29 +297,28 @@
                                                                           #js {:state (or (:state class) {})})
                                                  :render                (fn []
                                                                           (this-as this
-                                                                            (binding [*this* this]
-                                                                              (create-element this ((:render class) (clj-atts (.-props this)) (clj-state (.-state this)))))))}]
+                                                                            ((:render class) this (clj-atts (.-props this)) (clj-state (.-state this)))))}]
                                     (when mount
                                       (set! (.-componentDidMount obj)
                                             (fn []
-                                              (this-as this
-                                                (binding [*this* this]
-                                                  (mount))))))
+                                              (mount))))
                                     (when unmount
                                       (set! (.-componentWillUnmount obj)
                                             (fn []
                                               (this-as this
-                                                (binding [*this* this]
-                                                  (unmount (clj-state (.-state this))))))))
+                                                (unmount (clj-state (.-state this)))))))
                                     obj)))
            
-           (defn update-state! [fun & args]
+           (defn update-state! [this fun & args]
              "Update the component-local state with the given function"
-             (.setState *this*
+             (.setState this
                         #js {:state (apply fun
-                                           (clj-state (.-state *this*))
+                                           (clj-state (.-state this))
                                            args)}))
-
+           
+           (defn react-element [component atts]
+             (createElement (::react-class (@classes component)) #js {:atts atts  :env (::env atts) :query (::query atts)}))
+           
            (defn- refresh [remote-query?]
              "Force a redraw of the entire UI. This will trigger local parsers to gather data, and optionally will fetch data from server as well."
              (let [query (get-query (:component @mount-info))
@@ -375,5 +329,5 @@
                  (spec (vec query) :synchronous))
                (when remote-query?
                  (perform-remote-query (parse-query-remote query)))
-               (render (@make-root-component (create-element nil [(:component @mount-info) atts]))
+               (render (react-element (:component @mount-info) atts)
                        (:dom-element @mount-info)))))) 
