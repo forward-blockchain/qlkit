@@ -48,7 +48,7 @@
   (let [{:keys [state parsers]}      @mount-info
         {:keys [read remote mutate]} parsers
         key                          (first query-term)
-        read-fun                     (get-fn read query-term env @state)
+        read-fun                     (get-fn read query-term env (when state @state))
         mutate-fun                   (get-fn mutate query-term env state)
         remote-fun                   (when remote
                                        (get-fn remote query-term state))]
@@ -56,10 +56,10 @@
       (throw (ex-info (str "no parser for " key) {})))
     (actualize (cond mutate-fun (if state
                                   (mutate-fun query-term env state)
-                                  (mutate-fun query-term env nil))
+                                  (mutate-fun query-term env))
                      read-fun   (if state
                                   (read-fun query-term env @state)
-                                  (read-fun query-term env nil))
+                                  (read-fun query-term env))
                      :else      nil))))
 
 (defn parse-query
@@ -174,9 +174,9 @@
                              (let [{:keys [state parsers]} @mount-info
                                    {:keys [remote]}        parsers
                                    key                     (first item)
-                                   remote-fun              (get-fn remote item @state)]
+                                   remote-fun              (get-fn remote item (when state @state))]
                                (if remote-fun
-                                 (conj acc (remote-fun item @state))
+                                 (conj acc (remote-fun item (when state @state)))
                                  acc)))
                            []
                            query)))
@@ -239,9 +239,8 @@
 (defn mount [args]
   "This is used to mount qlkit tied to a dom element (or without a dom element, when used on the server.) The args map can contain :parsers (the map of parsers) :component (The name of the root qlkit component) :state (a state atom) and :remote-handler (function to call for sending out changes to the server). Only one mount can be set up on the client, and one on the server."
   (assert (map? args) "QlKit needs a Map argument defining the options.")
-  (let [options (merge {:state (atom {})} args)]
-    (reset! mount-info options)
-    (refresh true)))
+  (reset! mount-info args)
+  (refresh true))
 
 (defn perform-remote-query [query]
   "This calls the remote handler to process the remote query and offers up a callback that is called when the server has returned the results from the query."

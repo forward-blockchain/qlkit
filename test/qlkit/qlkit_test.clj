@@ -15,10 +15,10 @@
     ;;coll is fully evaluated
     (is (= @x 10))))
 
-(defmulti read   (fn [a b c]   (first a)))
-(defmulti mutate (fn [a b c]   (first a)))
-(defmulti remote (fn [a b]     (first a)))
-(defmulti sync   (fn [a b c d] (first a)))
+(defmulti read   (fn [a & args] (first a)))
+(defmulti mutate (fn [a & args] (first a)))
+(defmulti remote (fn [a & args] (first a)))
+(defmulti sync   (fn [a & args] (first a)))
 
 (defn parse-with [fun query-term]
   (remove-all-methods read)
