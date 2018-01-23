@@ -2,12 +2,11 @@
   (:require #?@(:cljs [[react-dom :refer [render]]
                        [react :refer [createElement]]
                        [create-react-class :refer [createReactClass]]])
-            [qlkit.dom :as dom]            
             [qlkit.spec :as spec]
             [clojure.string :as st]))
 
 #?(:clj
-   (defmacro defcomponent [nam & bodies]
+   (defmacro defcomponent-raw [nam & bodies]
      "This macro lets you declare a component class. It can contain the sections of state, query, render, component-did-mount and/or component-will-unmount. It will define a name, which can be directly referenced in render functions to embed nested qlkit components."
      (doseq [[nam] bodies]
        (when-not ('#{state query render component-did-mount component-will-unmount} nam)
@@ -65,26 +64,7 @@
   "Takes a query and the environment and triggers all children. The key goal here is that environmental values passed to children need to be marked with the parent query they originated from, to aid in generating a well-formed remote query."
   (parse-query-into-map (drop 2 query-term) (assoc env ::parent-env (assoc env ::query-key (first query-term)))))
 
-(defn- camel-case [s]
-  "Convert a shishkabob string to camelcase"
-  (let [words (st/split s #"-")]
-    (apply str
-           (first words)
-           (for [word (rest words)]
-             (str (st/upper-case (first word)) (subs word 1))))))
-
-(defn- camel-case-keys [kv-map]
-  "CamelCases all the keys, but only if they are keywords."
-  (into {}
-        (for [[k v] kv-map]
-          [(if (keyword? k)
-             (keyword (camel-case (name k)))
-             k)
-           v])))
-
 (def classes (atom {}))
-
-(def ^:dynamic *this* nil)
 
 (declare react-class)
 
@@ -117,7 +97,7 @@
          (catch
              #?(:clj Exception
                 :cljs :default)
-           e
+             e
              #?(:cljs (println (str "component-helper parse error in " nam)))
            (throw e))))
   (swap! classes
@@ -127,24 +107,6 @@
            (:query class) (update :query normalize-query)
            #?(:cljs true
               :clj false) (assoc ::react-class (react-class class)))))
-
-(defn- fix-event-references [this props]
-  "This function decouples events from using the traditional javascript 'this' context into something that can be managed in a more clojure-y way."
-  (into {}
-        (for [[k v] props]
-          (if (fn? v)
-            [k (fn [& args]
-                 (binding [*this* this]
-                   (apply v args)))]
-            [k v]))))
-
-(defn- fix-classname [props]
-  "React doesn't permit the standard html 'class' property, this function reenables it when using qlkit."
-  (if (contains? props :class)
-    (-> props
-        (dissoc :class)
-        (assoc :className (:class props)))
-    props))
 
 (defn get-query [key]
   "Returns the query for a class. Note that in qlkit, queries are not changed at runtime and hence just retrieved at the class-level."
@@ -209,17 +171,6 @@
                  parent-env))
         query-term))))
 
-(defn- gather-style-props [props]
-  "Gathers legal DOM style elements in style tag. Can override this behavior by using string key instead of keyword key."
-  (let [{root-props false styles true} (group-by (fn [[k v]]
-                                                   (some? (dom/style-attributes k)))
-                                                 props)]
-    (cond-> (into {}
-                  root-props)
-      (seq styles) (assoc :style
-                          (into {}
-                                (camel-case-keys styles))))))
-
 (declare refresh)
 
 (defn mount [args]
@@ -238,10 +189,10 @@
          (parse-query-term-sync k v {}))
        (refresh false)))))
 
-(defn transact! [& query]
+(defn transact-raw! [this & query]
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
-  (let [[env component-query]   (if *this*
-                                  (let [props (.-props *this*)
+  (let [[env component-query]   (if this
+                                  (let [props (.-props this)
                                         env   (aget props "env")
                                         query (aget props "query")]
                                     [env query])
@@ -275,47 +226,8 @@
              "Associate an HTML element keyword with a React component."
              (swap! component-registry assoc k v))
 
-           (declare create-element)
+           (declare create-instance)
            
-           (defn- fix-inline-react [this props]
-             "These are idiosyncratic properties that may emit raw react components that need to be created."
-             (cond-> props
-               (contains? props :actions) (update :actions
-                                                  (fn [actions]
-                                                    (apply array (map (partial create-element this) actions))))
-               (contains? props :right-icon) (update :right-icon (partial create-element this))))
-
-           (defn- ensure-element-type [typ]
-             (or (cond (keyword? typ) (or (@component-registry typ)
-                                          (when (dom/valid-dom-elements typ)
-                                            (name typ)))
-                       (string? typ)  (when (dom/valid-dom-elements (keyword typ))
-                                        typ))
-                 (throw (ex-info "Not a valid dom element" {:type typ}))))
-
-           (defn- create-element [this el]
-             "This function takes an edn structure describing dom elements and instantiates them with them via React."
-             (if (or (string? el) (number? el))
-               el
-               (let [[typ & more]     el
-                     [props children] (if (map? (first more))
-                                        [(first more) (rest more)]
-                                        [{} more])
-                     children         (vec (map (partial create-element this) (splice-in-seqs children)))]
-                 (if (and (keyword? typ) (namespace typ))
-                   (let [{:keys [::react-class :query] :as class} (@classes typ)]
-                     (apply createElement react-class #js {:atts (dissoc props ::env) :env (::env props) :query query} children))
-                   (apply createElement
-                          (ensure-element-type typ)
-                          (->> props
-                               gather-style-props
-                               (fix-event-references this)
-                               fix-classname
-                               (fix-inline-react this)
-                               camel-case-keys
-                               clj->js)
-                          children)))))
-
            (defn- clj-state [state]
              "Pulls state out of the react component state."
              (if state
@@ -328,6 +240,8 @@
                (aget props "atts")
                {}))
 
+           (def rendering-middleware (atom []))
+           
            (defn- react-class [class]
              "Creates a react class from the qlkit class description format"
              (js/createReactClass (let [mount (:component-did-mount class)
@@ -340,29 +254,32 @@
                                                                           #js {:state (or (:state class) {})})
                                                  :render                (fn []
                                                                           (this-as this
-                                                                            (binding [*this* this]
-                                                                              (create-element this ((:render class) (clj-atts (.-props this)) (clj-state (.-state this)))))))}]
+                                                                            (reduce (fn [acc item]
+                                                                                      (item this acc))
+                                                                                    ((:render class) this (clj-atts (.-props this)) (clj-state (.-state this)))
+                                                                                    @rendering-middleware)))}]
                                     (when mount
                                       (set! (.-componentDidMount obj)
                                             (fn []
                                               (this-as this
-                                                (binding [*this* this]
-                                                  (mount))))))
+                                                (mount this)))))
                                     (when unmount
                                       (set! (.-componentWillUnmount obj)
                                             (fn []
                                               (this-as this
-                                                (binding [*this* this]
-                                                  (unmount (clj-state (.-state this))))))))
+                                                (unmount (clj-state (.-state this)))))))
                                     obj)))
            
-           (defn update-state! [fun & args]
+           (defn update-state-raw! [this fun & args]
              "Update the component-local state with the given function"
-             (.setState *this*
+             (.setState this
                         #js {:state (apply fun
-                                           (clj-state (.-state *this*))
+                                           (clj-state (.-state this))
                                            args)}))
 
+           (defn create-instance [component atts]
+             (createElement (::react-class (@classes component)) #js {:atts atts  :env (::env atts) :query (::query atts)}))
+           
            (defn- refresh [remote-query?]
              "Force a redraw of the entire UI. This will trigger local parsers to gather data, and optionally will fetch data from server as well."
              (let [query (get-query (:component @mount-info))
@@ -373,5 +290,5 @@
                  (spec (vec query) :synchronous))
                (when remote-query?
                  (perform-remote-query (parse-query-remote query)))
-               (render (@make-root-component (create-element nil [(:component @mount-info) atts]))
+               (render (@make-root-component (create-instance (:component @mount-info) atts))
                        (:dom-element @mount-info)))))) 
