@@ -35,7 +35,8 @@
              (println msg)
              ((or js/console.error
                   js/console.warn
-                  js/console.log)
+                  js/console.log
+                  identity)
               msg))))
 
 (def mount-info (atom {}))
