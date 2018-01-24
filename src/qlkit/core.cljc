@@ -37,10 +37,11 @@
   "Parses a single query term, i.e. something in the form [:person {} [:person/name] [:person/age]]. The environment is used to pass info from parent queries down to child queries."
   (let [{:keys [state parsers]}      @mount-info
         {:keys [read mutate]} parsers]
-    (actualize (cond (and (mutation-query-term? query-term) mutate)
-                     (if state
-                       (mutate query-term env state)
-                       (mutate query-term env))
+    (actualize (cond (mutation-query-term? query-term)
+                     (when mutate
+                       (if state
+                         (mutate query-term env state)
+                         (mutate query-term env)))
                      read
                      (if state
                        (read query-term env @state)
