@@ -40,7 +40,9 @@
     (doall x)
     x))
 
-(declare mutation-query-term?)
+(defn- mutation-query-term? [query-term]
+  "Indicates if the mutation term is a mutation- Note that this is a check for a 'shallow' mutation, by design subterms could still be a mutation."
+  (= \! (last (name (first query-term)))))
 
 (defn get-fn [f & args]
   (if (instance? #?(:cljs MultiFn
@@ -137,10 +139,6 @@
 (defn get-query [key]
   "Returns the query for a class. Note that in qlkit, queries are not changed at runtime and hence just retrieved at the class-level."
   (:query (@classes key)))
-
-(defn- mutation-query-term? [query-term]
-  "Indicates if the mutation term is a mutation- Note that this is a check for a 'shallow' mutation, by design subterms could still be a mutation."
-  (= \! (last (name (first query-term)))))
 
 (defn- parse-query-remote [query]
   "This parses a query and sends off its parts to any 'remote' query handlers. Returns another query (the query to send to the server) as a result."
