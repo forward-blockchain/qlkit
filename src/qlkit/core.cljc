@@ -23,6 +23,12 @@
                                `(fn ~(first more)
                                   ~@(rest more))])))))))
 
+(defn safe-deref [state]
+  (if #?(:clj (instance? clojure.lang.IDeref state)
+         :cljs (satisfies? IDeref state))
+    @state
+    state))
+
 (defn warning [msg]
   #?(:clj (throw (ex-info msg {}))
      :cljs (if (not (exists? js/console))
@@ -67,7 +73,7 @@
                    (mutation-query-term? query-term)
                    (when mutate-fn (mutate-fn query-term env state))
                    read
-                   (read query-term env (when state @state))
+                   (read query-term env (safe-deref state))
                    :else      nil))
       (warning (str "[QlKit] mutate! query must have either a mutate or a remote parser: "
                     (pr-str query-term))))))
@@ -141,9 +147,10 @@
   "This parses a query and sends off its parts to any 'remote' query handlers. Returns another query (the query to send to the server) as a result."
   (normalize-query (reduce (fn [acc item]
                              (let [{:keys [state parsers]} @mount-info
-                                   {:keys [remote]}        parsers]
-                               (if (get-fn remote item (when state @state))
-                                 (if-let [v (remote item (when state @state))]
+                                   {:keys [remote]}        parsers
+                                   state' (safe-deref state)]
+                               (if (get-fn remote item state')
+                                 (if-let [v (remote item state')]
                                    (conj acc v)
                                    acc)
                                  acc)))
