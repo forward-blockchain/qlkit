@@ -36,9 +36,7 @@
   (is (= (parse-with (fn []
                        (defmethod read :foo
                          [query-term env state]
-                         42)
-                       
-                       )
+                         42))
                      [:foo])
          42))
   ;;a mutate function returns a result, but also performs mutations
