@@ -24,8 +24,7 @@
                                   ~@(rest more))])))))))
 
 (defn warning [msg]
-  #?(:clj (binding [*out* *err*]
-            (println msg))
+  #?(:clj (throw (ex-info msg {}))
      :cljs (if (not (exists? js/console))
              (println msg)
              ((or js/console.error
@@ -148,7 +147,7 @@
   (normalize-query (reduce (fn [acc item]
                              (let [{:keys [state parsers]} @mount-info
                                    {:keys [remote]}        parsers]
-                               (if remote
+                               (if (get-fn remote item (when state @state))
                                  (if-let [v (remote item (when state @state))]
                                    (conj acc v)
                                    acc)
