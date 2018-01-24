@@ -6,7 +6,7 @@
             [clojure.string :as st]))
 
 #?(:clj
-   (defmacro defcomponent-raw [nam & bodies]
+   (defmacro defcomponent* [nam & bodies]
      "This macro lets you declare a component class. It can contain the sections of state, query, render, component-did-mount and/or component-will-unmount. It will define a name, which can be directly referenced in render functions to embed nested qlkit components."
      (doseq [[nam] bodies]
        (when-not ('#{state query render component-did-mount component-will-unmount} nam)
@@ -189,7 +189,7 @@
          (parse-query-term-sync k v {}))
        (refresh false)))))
 
-(defn transact-raw! [this & query]
+(defn transact!* [this & query]
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
   (let [[env component-query]   (if this
                                   (let [props (.-props this)
@@ -270,7 +270,7 @@
                                                 (unmount (clj-state (.-state this)))))))
                                     obj)))
            
-           (defn update-state-raw! [this fun & args]
+           (defn update-state!* [this fun & args]
              "Update the component-local state with the given function"
              (.setState this
                         #js {:state (apply fun
