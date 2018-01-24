@@ -183,12 +183,14 @@
 (defn perform-remote-query [query]
   "This calls the remote handler to process the remote query and offers up a callback that is called when the server has returned the results from the query."
   (when (seq query)
-    ((:remote-handler @mount-info)
-     query
-     (fn [results]
-       (doseq [[k v] (map vector query results)]
-         (parse-query-term-sync k v {}))
-       (refresh false)))))
+    (if-let [handler (:remote-handler @mount-info)]
+      (handler
+       query
+       (fn [results]
+         (doseq [[k v] (map vector query results)]
+           (parse-query-term-sync k v {}))
+         (refresh false)))
+      (println (str "[QlKit] Missing :remote-handler but received query: " (pr-str query))))))
 
 (defn transact!* [this & query]
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
