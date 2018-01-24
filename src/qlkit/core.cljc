@@ -58,13 +58,14 @@
 (defn- parse-query-term [query-term env]
   "Parses a single query term, i.e. something in the form [:person {} [:person/name] [:person/age]]. The environment is used to pass info from parent queries down to child queries."
   (let [{:keys [state parsers]}      @mount-info
-        {:keys [read mutate remote]} parsers]
+        {:keys [read mutate remote]} parsers
+        mutate-fn (get-fn mutate query-term env state)]
     (if (or (not (mutation-query-term? query-term))
-            (get-fn mutate query-term env state)
+            mutate-fn
             (get-fn remote query-term state))
       (actualize (cond
                    (mutation-query-term? query-term)
-                   (when mutate (mutate query-term env state))
+                   (when mutate-fn (mutate-fn query-term env state))
                    read
                    (read query-term env @state)
                    :else      nil))
