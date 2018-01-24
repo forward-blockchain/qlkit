@@ -62,16 +62,12 @@
     (if (or (not (mutation-query-term? query-term))
             (get-fn mutate query-term env state)
             (get-fn remote query-term state))
-      (actualize (cond (mutation-query-term? query-term)
-                       (when mutate
-                         (if state
-                           (mutate query-term env state)
-                           (mutate query-term env)))
-                       read
-                       (if state
-                         (read query-term env @state)
-                         (read query-term env))
-                       :else      nil))
+      (actualize (cond
+                   (mutation-query-term? query-term)
+                   (when mutate (mutate query-term env state))
+                   read
+                   (read query-term env @state)
+                   :else      nil))
       (warning (str "[QlKit] mutate! query must have either a mutate or a remote parser: "
                     (pr-str query-term))))))
 
