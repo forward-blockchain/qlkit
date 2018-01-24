@@ -67,7 +67,7 @@
                    (mutation-query-term? query-term)
                    (when mutate-fn (mutate-fn query-term env state))
                    read
-                   (read query-term env @state)
+                   (read query-term env (when state @state))
                    :else      nil))
       (warning (str "[QlKit] mutate! query must have either a mutate or a remote parser: "
                     (pr-str query-term))))))
