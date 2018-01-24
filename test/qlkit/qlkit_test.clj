@@ -54,14 +54,7 @@
                         #"No method in multimethod"
                         (parse-with (fn [])
                                     [:foo])))
-  ;;If there's a remote parser, it's OK to not have other parsers
-  (is (nil? (parse-with (fn []
-                          ;; if there is a reader we must handle default
-                          (defmethod read :default [a b c])
-                          (defmethod remote :foo
-                            [query-term state]
-                            33))
-                        [:foo])))
+
   ;;A parser can call parse children for recursive parsing
   (is (= (map #(dissoc % ::ql/env)
               (parse-with (fn []
@@ -74,34 +67,6 @@
                               ({0 :duck 1 :cat 2 :dog} (:animal-id env))))
                           [:animals {} [:name]]))
          [{:name :duck} {:name :cat} {:name :dog}])))
-
-(deftest camel-case-test []
-  (is (= (#'ql/camel-case "foo-bar")
-         "fooBar")))
-
-(deftest camel-case-keys-test []
-  (is (= (#'ql/camel-case-keys {:foo 1
-                              "bar" 2
-                              :foo-bar 3
-                              :fooDerp 4
-                              33 5})
-         {:foo 1, "bar" 2, :fooBar 3, :fooDerp 4, 33 5})))
-
-(deftest fix-event-references-test []
-  ;;If we bind 4 to the *this* dynvar, we can override this value with a value handed to the fix-event-references function
-  (binding [ql/*this* 4]
-    (let [result      (atom nil)
-          props       {:foo (fn []
-                              (reset! result ql/*this*))}
-          fixed-props (#'ql/fix-event-references 5 props)]
-      ((:foo fixed-props))
-      (is (= @result 5)))))
-
-(deftest fix-classname-test []
-  (is (= (#'ql/fix-classname {:class "foo"})
-         {:className "foo"}))
-  (is (= (#'ql/fix-classname {:foo "foo"})
-         {:foo "foo"})))
 
 (deftest splice-in-seqs-test []
   (is (= (#'ql/splice-in-seqs [:foo (list :bar :baz)])
@@ -174,9 +139,7 @@
                             [[:foo]])
          [[:foo {}]]))
   ;;If there are no remotes, we just get an empty seq
-  (is (= (parse-remote-with (fn []
-                              ;; must have a default handler in the nil case at least
-                              (defmethod remote :default [a b]))
+  (is (= (parse-remote-with (fn [])
                             [[:foo]])
          ()))
   ;;We can parse child queries when parsing a remote query, and parsing functions can modify the query
@@ -208,11 +171,12 @@
                      42)
     (is (= @state 42))
     ;;If a read query is missing a sync, an error is thrown
-    (is (thrown-with-msg? java.lang.IllegalArgumentException
-                          #"No method in multimethod"
-                          (parse-sync-with (fn [])
-                                           [:foo {}]
-                                           42)))
+    (is
+     (thrown-with-msg? clojure.lang.ExceptionInfo
+                       #"\[QlKit\] Missing sync parser.*"
+                       (parse-sync-with (fn [])
+                                        [:foo {}]
+                                        42)))
     ;;Remote mutations are permitted without a sync parser
     (parse-sync-with (fn []
                        ;; a default method is required
@@ -262,16 +226,6 @@
                           [[:foo]])
          [[:baz {:id-b 66, :id-a 77} [:bar {:id-a 55} [:foo]]]])))
 
-(deftest gather-style-props-test []
-  ;;Official dom style elements are gathered into style map
-  (is (= (#'ql/gather-style-props {:color :blue :foo 5})
-         {:foo 5
-          :style {:color :blue}}))
-  ;;Can override this behavior by using string keys
-  (is (= (#'ql/gather-style-props {"color" :blue :foo 5})
-         {:foo 5
-          "color" :blue})))
-
 (deftest mount-test []
   (ql/mount {:state (atom 5)})
   (is (= @(:state @ql/mount-info) 5)))
@@ -317,5 +271,5 @@
                                  :mutate mutate
                                  :remote remote}
                 :state          state})
-    (ql/transact! [:foo])
+    (ql/transact!* nil [:foo])
     (is (= @state {:foo :yup}))))
