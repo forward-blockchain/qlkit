@@ -23,6 +23,16 @@
                                `(fn ~(first more)
                                   ~@(rest more))])))))))
 
+(defn warning [msg]
+  #?(:clj (binding [*out* *err*]
+            (println msg))
+     :cljs (if (not (exists? js/console))
+             (println msg)
+             ((or js/console.error
+                  js/console.warn
+                  js/console.log)
+              msg))))
+
 (def mount-info (atom {}))
 
 (defn- actualize [x]
@@ -33,20 +43,36 @@
 
 (declare mutation-query-term?)
 
+(defn get-fn [f & args]
+  (if (instance? #?(:cljs MultiFn
+                    :clj clojure.lang.MultiFn)
+                 f)
+    (->> (apply (let [v #?(:cljs (.-dispatch-fn f)
+                           :clj (.-dispatchFn f))]
+                  v)
+                args)
+         (get-method f))
+    f))
+
 (defn- parse-query-term [query-term env]
   "Parses a single query term, i.e. something in the form [:person {} [:person/name] [:person/age]]. The environment is used to pass info from parent queries down to child queries."
   (let [{:keys [state parsers]}      @mount-info
-        {:keys [read mutate]} parsers]
-    (actualize (cond (mutation-query-term? query-term)
-                     (when mutate
+        {:keys [read mutate remote]} parsers]
+    (if (or (not (mutation-query-term? query-term))
+            (get-fn mutate query-term env state)
+            (get-fn remote query-term state))
+      (actualize (cond (mutation-query-term? query-term)
+                       (when mutate
+                         (if state
+                           (mutate query-term env state)
+                           (mutate query-term env)))
+                       read
                        (if state
-                         (mutate query-term env state)
-                         (mutate query-term env)))
-                     read
-                     (if state
-                       (read query-term env @state)
-                       (read query-term env))
-                     :else      nil))))
+                         (read query-term env @state)
+                         (read query-term env))
+                       :else      nil))
+      (warning (str "[QlKit] mutate! query must have either a mutate or a remote parser: "
+                    (pr-str query-term))))))
 
 (defn parse-query
   "Parses an entire query, i.e. something with multiple query terms, such as [[:person {} [:person/name]] [:widget {} [:widget/name]]]. The output of 'parse-query' is meant to be sent by the server to the client to pass back query results."
@@ -138,10 +164,10 @@
 
 (defn- parse-query-term-sync [[key :as query-term] result env]
   "Calls the sync parsers for a query term, which are responsible for merging server results into the client state."
-  (if-let [sync-fun (:sync (:parsers @mount-info))]
+  (if-let [sync-fun (get-fn (:sync (:parsers @mount-info)) query-term result env (:state @mount-info))]
     (actualize (sync-fun query-term result env (:state @mount-info)))
     (or (mutation-query-term? query-term)
-        (println (str "[QlKit] Missing sync parser but received sync query: "
+        (warning (str "[QlKit] Missing sync parser but received sync query: "
                       (pr-str query-term))))))
 
 (defn parse-children-sync [query-term result env]
@@ -191,7 +217,7 @@
          (doseq [[k v] (map vector query results)]
            (parse-query-term-sync k v {}))
          (refresh false)))
-      (println (str "[QlKit] Missing :remote-handler but received query: " (pr-str query))))))
+      (warning (str "[QlKit] Missing :remote-handler but received query: " (pr-str query))))))
 
 (defn transact!* [this & query]
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
