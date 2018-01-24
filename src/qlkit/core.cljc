@@ -138,10 +138,11 @@
 
 (defn- parse-query-term-sync [[key :as query-term] result env]
   "Calls the sync parsers for a query term, which are responsible for merging server results into the client state."
-  (when-let [sync-fun (:sync (:parsers @mount-info))]
+  (if-let [sync-fun (:sync (:parsers @mount-info))]
     (actualize (sync-fun query-term result env (:state @mount-info)))
-    #_(or (mutation-query-term? query-term)
-          (throw (ex-info (str "Missing sync parser for " key) {})))))
+    (or (mutation-query-term? query-term)
+        (println (str "[QlKit] Missing sync parser but received sync query: "
+                      (pr-str query-term))))))
 
 (defn parse-children-sync [query-term result env]
   "This function can be called from sync parsers to recursively perform child sync queries."
