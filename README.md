@@ -9,8 +9,8 @@ Qlkit is a ClojureScript web development framework heavily inspired by OmNext. I
 Qlkit is designed to be highly composable, and is therefore separated into the following packages:
 
 - `qlkit` contains the core routing and parsing engine
-- `qlkit-renderer` is an optional "batteries included" component rendering engine
-- `qlkit-material-ui` makes it easy to use [material ui](http://material-ui.com) components in your app
+- [`qlkit-renderer`](http://github.com/forward-blockchain/qlkit-renderer) is an optional "batteries included" component rendering engine
+- [`qlkit-material-ui`](http://github.com/forward-blockchain/qlkit-material-ui) makes it easy to use [material ui](http://material-ui.com) components in your app
 
 Everyone using these libraries is highly encouraged to read their source code: We have done our best to make sure the code in these libraries is easy to understand.
 
