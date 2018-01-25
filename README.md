@@ -28,4 +28,4 @@ Probably the easiest way to use and understand qlkit is to use our [fancy todo d
 
 For more advanced ClojureScript users, we have also created a [simpler demo app](http://github.com/forward-blockchain/qlkit-todo-demo-raw) with less "sugar" and which uses default React rendering and sablono.
 
-For additional info, please visit our Wiki!
+For additional info, [please visit our Wiki](https://github.com/forward-blockchain/qlkit/wiki)!
