@@ -1,5 +1,3 @@
-# Qlkit
-
 ![alt text](http://cdn-images-1.medium.com/max/400/1*2f0P9H1JHpr3MNQ3SKEWCQ.png)
 
 [Recommended Introductory Article](https://medium.com/p/79b7b118ddac)
