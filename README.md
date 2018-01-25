@@ -30,5 +30,7 @@ For more advanced ClojureScript users, we have also created a [simpler demo app]
 
 For additional info, [please visit our Wiki](https://github.com/forward-blockchain/qlkit/wiki)!
 
+
+---
 _Copyright (c) Conrad Barski. All rights reserved._
 _The use and distribution terms for this software are covered by the Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php), the same license used by Clojure._
