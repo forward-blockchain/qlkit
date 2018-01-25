@@ -16,6 +16,8 @@ Everyone using these libraries is highly encouraged to read their source code: W
 
 ## Installation
 
+*Be aware that qlkit is still alpha software at the moment, do not yet rely on it for production development!*
+
 To use qlkit, simply put the following dependency in your project.clj:
 
 ```
