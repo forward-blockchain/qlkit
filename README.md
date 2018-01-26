@@ -2,7 +2,7 @@
 
 [Recommended Introductory Article](https://medium.com/p/79b7b118ddac)
 
-Qlkit is a ClojureScript web development framework heavily inspired by OmNext. It relies on React for component rendering and makes use of a query language comparable to GraphQL to encapsulate components and to optimize server calls. It is lightweight, with around 300 lines of code in the core qlkit library and no outside dependencies (besides React).
+Qlkit is a ClojureScript web development framework inspired by OmNext. It relies on React for component rendering and makes use of a query language comparable to GraphQL to encapsulate components and to optimize server calls. It is lightweight, with around 300 lines of code in the core qlkit library and no outside dependencies (besides React).
 
 Qlkit is designed to be highly composable, and is therefore separated into the following packages:
 
