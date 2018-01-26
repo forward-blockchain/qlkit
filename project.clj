@@ -1,4 +1,4 @@
-(defproject qlkit "0.2.0-SNAPSHOT"
+(defproject qlkit "0.3.0"
   :description "FIXME: write this!"
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
