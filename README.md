@@ -19,10 +19,10 @@ Everyone using these libraries is highly encouraged to read their source code: W
 To use qlkit, simply put the following dependency in your project.clj:
 
 ```
-[qlkit "0.3.0"]
+[qlkit "0.2.0-SNAPSHOT"]
 ```
 
-Probably the easiest way to use and understand qlkit is to use our [fancy todo demo app](http://github.com/forward-blockchain/qlkit-todo-demo) as your starting point.
+The easiest way to use and understand qlkit is to rely on our [fancy todo demo app](http://github.com/forward-blockchain/qlkit-todo-demo) as your starting point.
 
 For more advanced ClojureScript users, we have also created a [simpler demo app](http://github.com/forward-blockchain/qlkit-todo-demo-raw) with less "sugar" and which uses default React rendering and sablono.
 
