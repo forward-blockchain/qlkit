@@ -10,7 +10,6 @@
 
   :dependencies [[org.clojure/clojure "1.9.0-beta4"]
                  [org.clojure/clojurescript "1.9.946"]
-                 [org.clojure/core.async  "0.3.443"]
                  [cljsjs/create-react-class "15.6.0-1"]
                  [cljsjs/react "15.6.1-1"]
                  [cljsjs/react-dom "15.6.1-1"]]
