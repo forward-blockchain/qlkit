@@ -89,7 +89,7 @@
 
 (defn- parse-query-into-map [query env]
   "This parses a query so the results are in nested maps for easy access. This is used for all internal query parsing in cases where there are unique keys for query terms, which is true except for the root query returned by 'transact!', which can have duplicate keys in order to guarantee side-effect order."
-  (into {::env env}
+  (into {::env env ::query query}
         (map vector (map first query) (parse-query query env))))
 
 (defn parse-children [query-term env]
