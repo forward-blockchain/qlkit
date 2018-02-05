@@ -1,7 +1,8 @@
 (ns qlkit.core
   (:require #?@(:cljs [[react-dom :refer [render]]
                        [react :refer [createElement]]
-                       [create-react-class :refer [createReactClass]]])
+                       [create-react-class :refer [createReactClass]]
+                       [goog.object :refer [get]]])
             [qlkit.spec :as spec]
             [clojure.string :as st]))
 
@@ -225,8 +226,8 @@
   "This function handles a mutating transaction, originating (usually) from a component context. It first runs the local mutations by parsing the query locally, then sends the remote parts to the server, finally rerenders the entire UI."
   (let [[env component-query]   (if this
                                   (let [props (.-props this)
-                                        env   (aget props "env")
-                                        query (aget props "query")]
+                                        env   (get props "env")
+                                        query (get props "query")]
                                     [env query])
                                   [{} nil])
         query                   (root-query env (normalize-query (concat query component-query)))
@@ -269,7 +270,7 @@
            (defn- clj-atts [props]
              "Fetches the component atts out of its react props"
              (if props
-               (aget props "atts")
+               (get props "atts")
                {}))
 
            (def rendering-middleware (atom []))
