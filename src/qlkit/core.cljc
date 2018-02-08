@@ -131,7 +131,7 @@
              #?(:clj Exception
                 :cljs :default)
              e
-             #?(:cljs (println (str "component-helper parse error in " nam)))
+             #?(:cljs (warning (str "add-class: parse error in " nam)))
            (throw e))))
   (swap! classes
          assoc
