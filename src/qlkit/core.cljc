@@ -9,7 +9,7 @@
    (defmacro defcomponent* [nam & bodies]
      "This macro lets you declare a component class. It can contain the sections of state, query, render, component-did-mount and/or component-will-unmount. It will define a name, which can be directly referenced in render functions to embed nested qlkit components."
      (doseq [[nam] bodies]
-       (when-not ('#{state query render component-did-mount component-will-unmount} nam)
+       (when-not ('#{state query render component-did-mount component-will-unmount component-will-receive-props} nam)
          (throw (ex-info (str "Unknown component member " nam) {}))))
      `(let [key# (keyword ~(str (:name (:ns &env))) ~(name nam))]
         (def ~nam key#)
@@ -278,6 +278,7 @@
              "Creates a react class from the qlkit class description format"
              (js/createReactClass (let [mount (:component-did-mount class)
                                         unmount (:component-will-unmount class)
+                                        rprops (:component-will-receive-props class)
                                         obj #js {:shouldComponentUpdate (fn [next-props next-state]
                                                                           (this-as this
                                                                             (or (not= (clj-atts (.-props this)) (clj-atts next-props))
@@ -294,20 +295,26 @@
                                       (set! (.-componentDidMount obj)
                                             (fn []
                                               (this-as this
-                                                (mount this)))))
+                                                (mount this (clj-atts (.-props this)))))))
                                     (when unmount
                                       (set! (.-componentWillUnmount obj)
                                             (fn []
                                               (this-as this
-                                                (unmount (clj-state (.-state this)))))))
+                                                (unmount this (clj-state (.-state this)))))))
+                                    (when rprops
+                                      (set! (.-componentWillReceiveProps obj)
+                                            (fn [props]
+                                              (this-as this
+                                                (rprops this (clj-atts props))))))
                                     obj)))
            
            (defn update-state!* [this fun & args]
              "Update the component-local state with the given function"
              (.setState this
-                        #js {:state (apply fun
-                                           (clj-state (.-state this))
-                                           args)}))
+                        (fn [state]
+                          #js {:state (apply fun
+                                             (clj-state state)
+                                             args)})))
 
            (defn create-instance [component atts]
              (createElement (::react-class (@classes component)) #js {:atts atts  :env (::env atts) :query (::query atts)}))
