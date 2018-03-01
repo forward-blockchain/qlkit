@@ -97,7 +97,9 @@
   "Takes a query and the environment and triggers all children. The key goal here is that environmental values passed to children need to be marked with the parent query they originated from, to aid in generating a well-formed remote query."
   (parse-query-into-map (drop 2 query-term) (assoc env ::parent-env (assoc env ::query-key (first query-term)))))
 
-(def classes (atom {}))
+(def ^{:doc "Atom containing the qlkit classes created by defcomponent"}
+  classes
+  (atom {}))
 
 (declare react-class)
 
