@@ -15,7 +15,7 @@
      `(let [key# (keyword ~(str (:name (:ns &env))) ~(name nam))]
         (def ~nam key#)
         (add-class key#
-                   ~(into {}
+                   ~(into {:display-name (name nam)}
                           (for [[nam & more :as body] bodies]
                             (if ('#{state query} nam)
                               [(keyword nam)
@@ -280,7 +280,9 @@
              (js/createReactClass (let [mount (:component-did-mount class)
                                         unmount (:component-will-unmount class)
                                         rprops (:component-will-receive-props class)
-                                        obj #js {:shouldComponentUpdate (fn [next-props next-state]
+                                        dname (:display-name class)
+                                        obj #js {:displayName           dname
+                                                 :shouldComponentUpdate (fn [next-props next-state]
                                                                           (this-as this
                                                                             (or (not= (clj-atts (.-props this)) (clj-atts next-props))
                                                                                 (not= (clj-state (.-state this)) (clj-state next-state)))))
