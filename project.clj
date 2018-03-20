@@ -1,20 +1,17 @@
 (defproject qlkit "0.3.0-SNAPSHOT"
-  :description "FIXME: write this!"
-  :url "http://example.com/FIXME"
+  :description "Clojurescript UI framework inspired by OmNext with Graph Queries"
+  :url "https://github.com/forward-blockchain/qlkit"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-
-  
-  
   :min-lein-version "2.7.1"
 
-  :dependencies [[org.clojure/clojure "1.9.0-beta4"]
+  :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/clojurescript "1.9.946"]
                  [cljsjs/create-react-class "15.6.2-0"]
                  [cljsjs/react "16.2.0-3"]
                  [cljsjs/react-dom "16.2.0-3"]]
 
-  :plugins [[lein-figwheel "0.5.14"]
+  :plugins [[lein-figwheel "0.5.15"]
             [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]]
 
   :source-paths ["src"]
@@ -57,7 +54,7 @@
                            :pretty-print   false
                            :install-deps   true
                            :npm-deps       {:create-react-class "15.6.0"}}}]}
-  
+
   :figwheel {;; :http-server-root "public" ;; default and assumes "resources"
              ;; :server-port 3449 ;; default
              ;; :server-ip "127.0.0.1"
@@ -101,8 +98,8 @@
   ;; Setting up nREPL for Figwheel and ClojureScript dev
   ;; Please see:
   ;; https://github.com/bhauman/lein-figwheel/wiki/Using-the-Figwheel-REPL-within-NRepl
-  :profiles {:dev {:dependencies [[binaryage/devtools "0.9.4"]
-                                  [figwheel-sidecar "0.5.14"]
+  :profiles {:dev {:dependencies [[binaryage/devtools "0.9.9"]
+                                  [figwheel-sidecar "0.5.15"]
                                   [com.cemerick/piggieback "0.2.2"]]
                    ;; need to add dev source path here to get user.clj loaded
                    :source-paths ["src" "dev"]
