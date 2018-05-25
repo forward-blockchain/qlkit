@@ -1,0 +1,5 @@
+{:paths   ["src" "resources"]
+ :deps    {org.clojure/clojurescript {:mvn/version "1.9.946"}
+           cljsjs/create-react-class {:mvn/version "15.6.2-0"}
+           cljsjs/react              {:mvn/version "16.2.0-3"}
+           cljsjs/react-dom          {:mvn/version "16.2.0-3"}}}
