@@ -210,7 +210,8 @@
   "This is used to mount qlkit tied to a dom element (or without a dom element, when used on the server.) The args map can contain :parsers (the map of parsers) :component (The name of the root qlkit component) :state (a state atom) and :remote-handler (function to call for sending out changes to the server). Only one mount can be set up on the client, and one on the server."
   (assert (map? args) "QlKit needs a Map argument defining the options.")
   (reset! mount-info args)
-  (refresh true))
+  (when-not (:server? args)
+    (refresh true)))
 
 (defn perform-remote-query [query]
   "This calls the remote handler to process the remote query and offers up a callback that is called when the server has returned the results from the query."
