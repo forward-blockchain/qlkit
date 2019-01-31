@@ -3,6 +3,7 @@
                        [react :refer [createElement]]
                        [create-react-class :refer [createReactClass]]
                        [goog.object :refer [get]]])
+            [fbc-utils.debug :as db :refer [??]]
             [qlkit.spec :as spec]
             [clojure.string :as st]))
 
@@ -147,23 +148,27 @@
   "Returns the query for a class. Note that in qlkit, queries are not changed at runtime and hence just retrieved at the class-level."
   (:query (@classes key)))
 
-(defn- parse-query-remote [query]
-  "This parses a query and sends off its parts to any 'remote' query handlers. Returns another query (the query to send to the server) as a result."
-  (normalize-query (reduce (fn [acc item]
-                             (let [{:keys [state parsers]} @mount-info
-                                   {:keys [remote]}        parsers
-                                   state' (safe-deref state)]
-                               (if (get-fn remote item state')
-                                 (if-let [v (remote item state')]
-                                   (conj acc v)
-                                   acc)
-                                 acc)))
-                           []
-                           query)))
+(defn- parse-query-remote
+  ([query env]
+   "This parses a query and sends off its parts to any 'remote' query handlers. Returns another query (the query to send to the server) as a result."
+   query
+   (normalize-query (reduce (fn [acc item]
+                              (let [{:keys [state parsers]} @mount-info
+                                    {:keys [remote]}        parsers
+                                    state' (safe-deref state)]
+                                (if (get-fn remote item env state')
+                                  (if-let [v (remote item env state')]
+                                    (conj acc v)
+                                    acc)
+                                  acc)))
+                            []
+                            query)))
+  ([query]
+   (parse-query-remote query {})))
 
-(defn parse-children-remote [[dispatch-key params & chi :as query]]
+(defn parse-children-remote [[dispatch-key params & chi :as query] env]
   "This is a function you can use within a remote query parser to iteratively execute the children of the query."
-  (let [chi-remote (parse-query-remote chi)]
+  (let [chi-remote (parse-query-remote chi env)]
     (when (seq chi-remote)
       (vec (concat [dispatch-key params] chi-remote)))))
 
