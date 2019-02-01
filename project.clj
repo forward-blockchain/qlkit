@@ -1,4 +1,4 @@
-(defproject qlkit "0.3.0-SNAPSHOT"
+(defproject qlkit "0.4.0-SNAPSHOT"
   :description "Clojurescript UI framework inspired by OmNext with Graph Queries"
   :url "https://github.com/forward-blockchain/qlkit"
   :license {:name "Eclipse Public License"
