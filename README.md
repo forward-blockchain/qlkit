@@ -16,10 +16,10 @@ Everyone using these libraries is highly encouraged to read their source code: W
 
 *Be aware that qlkit is still alpha software at the moment, do not yet rely on it for production development!*
 
-To use qlkit, simply put the following dependency in your project.clj:
+To use qlkit, simply put the following dependency in your deps.edn:
 
 ```
-[qlkit "0.3.0-SNAPSHOT"]
+qlkit {:mvn/version "0.4.0-SNAPSHOT"}
 ```
 
 The easiest way to use and understand qlkit is to rely on our [fancy todo demo app](http://github.com/forward-blockchain/qlkit-todo-demo) as your starting point.
