@@ -14,15 +14,15 @@
          (throw (ex-info (str "Unknown component member " nam) {}))))
      `(let [key# (keyword ~(str (:name (:ns &env))) ~(name nam))]
         (def ~nam key#)
-        (add-class key#
-                   ~(into {:display-name (name nam)}
-                          (for [[nam & more :as body] bodies]
-                            (if ('#{state query} nam)
-                              [(keyword nam)
-                               (last more)]
-                              [(keyword nam)
-                               `(fn ~(first more)
-                                  ~@(rest more))])))))))
+        (#'add-class key#
+                     ~(into {:display-name (name nam)}
+                            (for [[nam & more :as body] bodies]
+                              (if ('#{state query} nam)
+                                [(keyword nam)
+                                 (last more)]
+                                [(keyword nam)
+                                 `(fn ~(first more)
+                                    ~@(rest more))])))))))
 
 (defn safe-deref [state]
   (if #?(:clj (instance? clojure.lang.IDeref state)
