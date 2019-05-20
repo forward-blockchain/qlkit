@@ -276,7 +276,7 @@
   (is (= (#'ql/aggregate-read-queries [[:foo {}]]) [[:foo {}]]))
   (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:bar {}]]]) [[:foo {} [:bar {}]]]))
   (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:baz {}]]]) [[:foo {} [:bar {}] [:baz {}]]]))
-  (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {} [:derp1 {}]]] [:foo {} [:bar {} [:derp2 {}]]]]) [[:foo {} [:bar {} [:derp1 {}] [:derp2 {}]]]]            ))
+  (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {} [:derp1 {}]]] [:foo {} [:bar {} [:derp2 {}]]]]) [[:foo {} [:bar {} [:derp1 {}] [:derp2 {}]]]]))
   (is (thrown-with-msg? clojure.lang.ExceptionInfo
                         #"query terms with empty and non-empty params cannot be merged."
                         (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {:a 1} [:bar {}]]])))
@@ -286,4 +286,3 @@
                         #"query terms with params containing identical keys that have different non-sequence values cannot be merged."
                         (#'ql/aggregate-read-queries [[:foo {:a 2} [:bar {}]] [:foo {:a 1} [:bar {}]]])))
   (is (= (#'ql/aggregate-read-queries [[:foo {:a #{2}} [:bar {}]] [:foo {:a #{1}} [:bar {}]]]) [[:foo {:a #{1 2}} [:bar {}]]])))
-
