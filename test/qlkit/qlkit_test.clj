@@ -54,7 +54,7 @@
                                     [:foo])))
 
   ;;A parser can call parse children for recursive parsing
-  (is (= (map #(dissoc % ::ql/env)
+  (is (= (map #(dissoc % ::ql/env ::ql/query)
               (parse-with (fn []
                             (defmethod read :animals
                               [query-term env state]
@@ -91,7 +91,7 @@
     (is (thrown-with-msg? java.lang.AssertionError
                           #"Assert failed: \(:render class\)"
                           (#'ql/add-class :foo {:bar fun}))))
- ;;a query can uptionally be added to the class
+  ;;a query can uptionally be added to the class
   (let [fun (fn [])]
     (reset! ql/classes {})
     (#'ql/add-class :foo {:render fun
@@ -102,7 +102,7 @@
   ;;query has to match clojure.spec declaration
   (let [fun (fn [])]
     (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                          #"Invalid query: \n\[\[\"foo\" \{\}\]]\nIn: \[0 0\] val: \"foo\" fails spec: :qlkit.spec/query-term at: \[:query :tag\] predicate: keyword\?\n"
+                          #"Invalid query"
                           (reset! ql/classes {})
                           (#'ql/add-class :foo {:render fun
                                                 :query [["foo"]]})))))
@@ -131,22 +131,22 @@
                          :state (atom nil)})
   ;;If the remote returns the query, then we get our query back
   (is (= (parse-remote-with (fn []
-                       (defmethod remote :foo
-                         [query state]
-                         query))
+                              (defmethod remote :foo
+                                [query state env]
+                                query))
                             [[:foo]])
          [[:foo {}]]))
   ;;If there are no remotes, we just get an empty seq
   (is (= (parse-remote-with (fn [])
                             [[:foo]])
-         ()))
+         nil))
   ;;We can parse child queries when parsing a remote query, and parsing functions can modify the query
   (is (= (parse-remote-with (fn []
                               (defmethod remote :foo
-                                [query state]
-                                (ql/parse-children-remote query))
+                                [query state env]
+                                (ql/parse-children-remote query env))
                               (defmethod remote :bar
-                                [query state]
+                                [query state env]
                                 [:bar {:baz 42}]))
                             [[:foo {} [:bar]]])
          [[:foo {} [:bar {:baz 42}]]])))
@@ -257,24 +257,33 @@
       [query-term env state]
       42)
     (defmethod remote :foo
-      [query-term state]
+      [query-term state env]
       query-term)
     (defmethod sync :foo
       [query-term result env state-atom]
       (swap! state-atom assoc :foo result))
     (ql/mount {:remote-handler (fn [query callback]
-                                  (callback [:yup]))
-                :parsers        {:sync sync
-                                 :read read
-                                 :mutate mutate
-                                 :remote remote}
-                :state          state})
+                                 (callback [:yup]))
+               :parsers        {:sync sync
+                                :read read
+                                :mutate mutate
+                                :remote remote}
+               :state          state})
     (ql/transact!* nil [:foo])
     (is (= @state {:foo :yup}))))
 
-;; (aggregate-read-queries [[:foo {}]])
-;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:bar {}]]])
-;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:baz {}]]])
-;; (aggregate-read-queries [[:foo {} [:bar {} [:derp1 {}]]] [:foo {} [:bar {} [:derp2 {}]]]])
-;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {:a 1} [:bar {}]]])
-;; (aggregate-read-queries [[:foo {}] [:baz {}] [:baz {}] [:bar! {}] [:foo {}]])
+(deftest aggregate-read-queries-test []
+  (is (= (#'ql/aggregate-read-queries [[:foo {}]]) [[:foo {}]]))
+  (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:bar {}]]]) [[:foo {} [:bar {}]]]))
+  (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:baz {}]]]) [[:foo {} [:bar {}] [:baz {}]]]))
+  (is (= (#'ql/aggregate-read-queries [[:foo {} [:bar {} [:derp1 {}]]] [:foo {} [:bar {} [:derp2 {}]]]]) [[:foo {} [:bar {} [:derp1 {}] [:derp2 {}]]]]            ))
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"query terms with empty and non-empty params cannot be merged."
+                        (#'ql/aggregate-read-queries [[:foo {} [:bar {}]] [:foo {:a 1} [:bar {}]]])))
+  (is (= (#'ql/aggregate-read-queries [[:foo {:b 2} [:bar {}]] [:foo {:a 1} [:bar {}]]]) [[:foo {:b 2, :a 1} [:bar {}]]]))
+  (is (= (#'ql/aggregate-read-queries [[:foo {}] [:baz {}] [:baz {}] [:bar! {}] [:foo {}]]) [[:foo {}] [:baz {}] [:bar! {}] [:foo {}]]))
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"query terms with params containing identical keys that have different non-sequence values cannot be merged."
+                        (#'ql/aggregate-read-queries [[:foo {:a 2} [:bar {}]] [:foo {:a 1} [:bar {}]]])))
+  (is (= (#'ql/aggregate-read-queries [[:foo {:a #{2}} [:bar {}]] [:foo {:a #{1}} [:bar {}]]]) [[:foo {:a #{1 2}} [:bar {}]]])))
+

@@ -15,5 +15,5 @@ pom.xml
 .DS_Store
 package-lock.json
 package.json
-
+.cpcache
 .lein-failures

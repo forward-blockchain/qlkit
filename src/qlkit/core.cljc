@@ -91,14 +91,13 @@
 
 (defn- parse-query-into-map [query env]
   "This parses a query so the results are in nested maps for easy access. This is used for all internal query parsing in cases where there are unique keys for query terms, which is true except for the root query returned by 'transact!', which can have duplicate keys in order to guarantee side-effect order."
-  (into {::env env ::query query}
+  (into #?(:clj  {} ;;Only components need local env/query, so let's strip them for server-side requests
+           :cljs {::env env ::query query})
         (map vector (map first query) (parse-query query env))))
 
 (defn parse-children [query-term env]
   "Takes a query and the environment and triggers all children. The key goal here is that environmental values passed to children need to be marked with the parent query they originated from, to aid in generating a well-formed remote query."
-  (parse-query-into-map (drop 2 query-term)
-                        #?(:clj  env
-                           :cljs (assoc env ::parent-env (assoc env ::query-key (first query-term))))))
+  (parse-query-into-map (drop 2 query-term) (assoc env ::parent-env (assoc env ::query-key (first query-term)))))
 
 (def ^{:doc "Atom containing the qlkit classes created by defcomponent"}
   classes
@@ -127,6 +126,25 @@
              params
              (normalize-query-helper children)))))
 
+(defn- aggregate-params [params-coll]
+  "Aggregates params accross similar query terms with different params. If one of the query terms is the empty query {} it must be the only query (or the params will become 'overspecialized') Otherwise, param key names across terms must be distinct OR identical in value OR they must both have collection values (so that concating them is possible)"
+  (let [[param & more] (distinct params-coll)]
+    (reduce (fn [acc item]
+              (if (and (seq acc) (seq item))
+                (into {}
+                      (for [key (keys (merge acc item))]
+                        [key
+                         (let [acc-val  (acc key)
+                               item-val (item key)]
+                           (cond (not acc-val)                          item-val
+                                 (not item-val)                         acc-val
+                                 (= acc-val item-val)                   acc-val
+                                 (and (coll? acc-val) (coll? item-val)) (apply conj acc-val item-val)
+                                 :else                                  (throw (ex-info "query terms with params containing identical keys that have different non-sequence values cannot be merged." {}))))]))
+                (throw (ex-info "query terms with empty and non-empty params cannot be merged." {}))))
+            param
+            more)))
+
 (defn- aggregate-read-queries [query]
   "If two query terms of the same type exist in the query, and they are not separated by a mutation query, we combine them, recursively."
   (when-let [[query-term & more] (seq query)]
@@ -134,7 +152,7 @@
       (cons query-term (aggregate-read-queries more))
       (let [[nam params & children]
             query-term
-            {:keys [extra-children remaining]}
+            {:keys [extra-children extra-params remaining]}
             (reduce (fn [{:keys [finished] :as acc} [cur-nam cur-params & cur-children :as item]]
                       (cond finished
                             (update acc :remaining conj item)
@@ -142,20 +160,25 @@
                             (-> acc
                                 (assoc :finished true)
                                 (update :remaining conj item))
-                            (and (= cur-nam nam) (= cur-params params))
-                            (update acc
-                                    :extra-children
-                                    (fn [children]
-                                      (apply conj children cur-children)))
                             (= cur-nam nam)
-                            (throw (ex-info "there are two read queries with the same name but different params, this is not currently supported by qlkit." {}))
+                            (-> acc
+                                (update :extra-children
+                                        (fn [children]
+                                          (apply conj children cur-children)))
+                                (update :extra-params
+                                        (fn [params]
+                                          (conj params cur-params))))
                             :else
                             (update acc :remaining conj item)))
                     {:extra-children []
+                     :extra-params   [params]
                      :remaining      []
                      :finished       false}
                     more)]
-        `[[~nam ~params ~@(aggregate-read-queries (concat children extra-children))] ~@(aggregate-read-queries remaining)]))))
+        `[[~nam
+           ~(aggregate-params extra-params)
+           ~@(aggregate-read-queries (concat children extra-children))]
+          ~@(aggregate-read-queries remaining)]))))
 
 (defn- normalize-query [query]
   (aggregate-read-queries (normalize-query-helper query)))
