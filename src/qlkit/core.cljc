@@ -25,10 +25,11 @@
                                     ~@(rest more))])))))))
 
 (defn safe-deref [state]
-  (if #?(:clj (instance? clojure.lang.IDeref state)
-         :cljs (satisfies? IDeref state))
-    @state
-    state))
+  (let [k #?(:clj (instance? clojure.lang.IDeref state)
+             :cljs (satisfies? IDeref state))]
+    (if k
+      @state
+      state)))
 
 (defn warning [msg]
   #?(:clj (throw (ex-info msg {}))
@@ -40,7 +41,7 @@
                   identity)
               msg))))
 
-(def mount-info (atom {}))
+(defonce mount-info (atom {}))
 
 (defn- actualize [x]
   "This function makes sure all shallow lazy sequences are expanded, IF there is a lazy sequence."
@@ -95,7 +96,9 @@
 
 (defn parse-children [query-term env]
   "Takes a query and the environment and triggers all children. The key goal here is that environmental values passed to children need to be marked with the parent query they originated from, to aid in generating a well-formed remote query."
-  (parse-query-into-map (drop 2 query-term) (assoc env ::parent-env (assoc env ::query-key (first query-term)))))
+  (parse-query-into-map (drop 2 query-term)
+                        #?(:clj  env
+                           :cljs (assoc env ::parent-env (assoc env ::query-key (first query-term))))))
 
 (def ^{:doc "Atom containing the qlkit classes created by defcomponent"}
   classes
@@ -112,7 +115,7 @@
           []
           coll))
 
-(defn- normalize-query [query]
+(defn- normalize-query-helper [query]
   "Splices in seqs recursively, and also puts in missing empty attribute lists."
   (for [item (splice-in-seqs query)]
     (let [maybe-params  (second item)
@@ -122,7 +125,40 @@
       (apply vector
              nam
              params
-             (normalize-query children)))))
+             (normalize-query-helper children)))))
+
+(defn- aggregate-read-queries [query]
+  "If two query terms of the same type exist in the query, and they are not separated by a mutation query, we combine them, recursively."
+  (when-let [[query-term & more] (seq query)]
+    (if (mutation-query-term? query-term)
+      (cons query-term (aggregate-read-queries more))
+      (let [[nam params & children]
+            query-term
+            {:keys [extra-children remaining]}
+            (reduce (fn [{:keys [finished] :as acc} [cur-nam cur-params & cur-children :as item]]
+                      (cond finished
+                            (update acc :remaining conj item)
+                            (mutation-query-term? item)
+                            (-> acc
+                                (assoc :finished true)
+                                (update :remaining conj item))
+                            (and (= cur-nam nam) (= cur-params params))
+                            (update acc
+                                    :extra-children
+                                    (fn [children]
+                                      (apply conj children cur-children)))
+                            (= cur-nam nam)
+                            (throw (ex-info "there are two read queries with the same name but different params, this is not currently supported by qlkit." {}))
+                            :else
+                            (update acc :remaining conj item)))
+                    {:extra-children []
+                     :remaining      []
+                     :finished       false}
+                    more)]
+        `[[~nam ~params ~@(aggregate-read-queries (concat children extra-children))] ~@(aggregate-read-queries remaining)]))))
+
+(defn- normalize-query [query]
+  (aggregate-read-queries (normalize-query-helper query)))
 
 (defn- add-class [nam class]
   "Adds a qlkit class to the global list of classes. Note that a 'qlkit class' is just a clojure map."
@@ -145,7 +181,7 @@
 
 (defn get-query [key]
   "Returns the query for a class. Note that in qlkit, queries are not changed at runtime and hence just retrieved at the class-level."
-  (:query (@classes key)))
+  (seq (:query (@classes key))))
 
 (defn- parse-query-remote
   ([query env]
@@ -210,12 +246,17 @@
 
 (declare refresh)
 
+(declare tick)
+
 (defn mount [args]
   "This is used to mount qlkit tied to a dom element (or without a dom element, when used on the server.) The args map can contain :parsers (the map of parsers) :component (The name of the root qlkit component) :state (a state atom) and :remote-handler (function to call for sending out changes to the server). Only one mount can be set up on the client, and one on the server."
   (assert (map? args) "QlKit needs a Map argument defining the options.")
-  (reset! mount-info args)
-  (when-not (:server? args)
-    (refresh true)))
+  (let [new-version (inc (or (:version @mount-info) 0))]
+    (reset! mount-info
+           (assoc args :version new-version))
+    (when-not (:server? args)
+      (refresh true))
+    #?(:cljs (js/window.requestAnimationFrame (partial tick new-version)))))
 
 (defn perform-remote-query [query]
   "This calls the remote handler to process the remote query and offers up a callback that is called when the server has returned the results from the query."
@@ -250,8 +291,10 @@
       (perform-remote-query q))
     (refresh false)))
 
-#?(:clj (defn- refresh [remote-query?]
-          nil)
+#?(:clj (do (defn- refresh [remote-query?]
+              nil)
+            (defn- tick [mount-version]
+              nil))
    :cljs (do 
 
            (def ^{:doc "Atom containing a function that takes a React component and returns the React component at the root of the application's DOM."}
@@ -328,16 +371,28 @@
 
            (defn create-instance [component atts]
              (createElement (::react-class (@classes component)) #js {:atts atts  :env (::env atts) :query (::query atts)}))
+
+           (def dirty (atom 0))
            
+           (defn tick [mount-version]
+             (when (= (:version @mount-info) mount-version)
+               (let [cur-dirty @dirty]
+                 (reset! dirty 0)
+                 (when (and (pos? cur-dirty) (not= @mount-info {}))
+                   (let [query (get-query (:component @mount-info))
+                         atts       (parse-query-into-map query {})]
+                     (render (@make-root-component (create-instance (:component @mount-info) atts))                                                                         (:dom-element @mount-info))))
+                 (js/window.requestAnimationFrame (partial tick mount-version)))))
+
            (defn- refresh [remote-query?]
              "Force a redraw of the entire UI. This will trigger local parsers to gather data, and optionally will fetch data from server as well."
-             (let [query (get-query (:component @mount-info))
+             (when remote-query?
+               (let [query (get-query (:component @mount-info))
                    atts       (parse-query-into-map query {})
                    {{spec :spec} :parsers} @mount-info]
                (spec/query-spec (vec query))
                (when spec
                  (spec (vec query) :synchronous))
                (when remote-query?
-                 (perform-remote-query (parse-query-remote query)))
-               (render (@make-root-component (create-instance (:component @mount-info) atts))
-                       (:dom-element @mount-info)))))) 
+                 (perform-remote-query (parse-query-remote query)))))
+             (swap! dirty inc)))) 

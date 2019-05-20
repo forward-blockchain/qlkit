@@ -271,3 +271,10 @@
                 :state          state})
     (ql/transact!* nil [:foo])
     (is (= @state {:foo :yup}))))
+
+;; (aggregate-read-queries [[:foo {}]])
+;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:bar {}]]])
+;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {} [:baz {}]]])
+;; (aggregate-read-queries [[:foo {} [:bar {} [:derp1 {}]]] [:foo {} [:bar {} [:derp2 {}]]]])
+;; (aggregate-read-queries [[:foo {} [:bar {}]] [:foo {:a 1} [:bar {}]]])
+;; (aggregate-read-queries [[:foo {}] [:baz {}] [:baz {}] [:bar! {}] [:foo {}]])
