@@ -307,11 +307,11 @@
     (when spec
       (spec (vec query) :synchronous))
     (parse-query query env)
-    (let [q (seq (parse-query-remote query))]
+    (let [q (seq (parse-query-remote query))]  
       (spec/query-spec (vec q))
       (when spec
         (spec (vec q) :asynchronous))
-      (perform-remote-query q))
+      (perform-remote-query (vec (concat q (get-query (:component @mount-info))))))
     (refresh false)))
 
 #?(:clj (do (defn- refresh [remote-query?]
