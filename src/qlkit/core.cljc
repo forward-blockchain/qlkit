@@ -311,7 +311,7 @@
       (spec/query-spec (vec q))
       (when spec
         (spec (vec q) :asynchronous))
-      (perform-remote-query (vec (concat q (get-query (:component @mount-info))))))
+      (perform-remote-query (vec (concat q (parse-query-remote (get-query (:component @mount-info)))))))
     (refresh false)))
 
 #?(:clj (do (defn- refresh [remote-query?]
