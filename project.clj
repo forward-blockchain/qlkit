@@ -1,4 +1,4 @@
-(defproject qlkit "0.4.0-SNAPSHOT"
+(defproject qlkit "0.5.0-SNAPSHOT"
   :description "Clojurescript UI framework inspired by OmNext with Graph Queries"
   :url "https://github.com/forward-blockchain/qlkit"
   :license {:name "Eclipse Public License"
@@ -8,8 +8,8 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.clojure/clojurescript "1.10.516"]
                  [cljsjs/create-react-class "15.6.3-1"]
-                 [cljsjs/react "16.6.0-0"]
-                 [cljsjs/react-dom "16.6.0-0"]]
+                 [cljsjs/react "16.11.0-0"]
+                 [cljsjs/react-dom "16.11.0-0"]]
 
   :plugins [[lein-figwheel "0.5.15"]
             [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]]

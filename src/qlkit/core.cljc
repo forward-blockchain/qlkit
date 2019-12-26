@@ -404,18 +404,18 @@
                  (when (and (pos? cur-dirty) (not= @mount-info {}))
                    (let [query (get-query (:component @mount-info))
                          atts       (parse-query-into-map query {})]
-                     (render (@make-root-component (create-instance (:component @mount-info) atts))                                                                         (:dom-element @mount-info))))
+                     (render (@make-root-component (create-instance (:component @mount-info) atts)) (:dom-element @mount-info))))
                  (js/window.requestAnimationFrame (partial tick mount-version)))))
 
            (defn- refresh [remote-query?]
              "Force a redraw of the entire UI. This will trigger local parsers to gather data, and optionally will fetch data from server as well."
              (when remote-query?
                (let [query (get-query (:component @mount-info))
-                   atts       (parse-query-into-map query {})
-                   {{spec :spec} :parsers} @mount-info]
-               (spec/query-spec (vec query))
-               (when spec
-                 (spec (vec query) :synchronous))
-               (when remote-query?
-                 (perform-remote-query (parse-query-remote query)))))
+                     atts       (parse-query-into-map query {})
+                     {{spec :spec} :parsers} @mount-info]
+                 (spec/query-spec (vec query))
+                 (when spec
+                   (spec (vec query) :synchronous))
+                 (when remote-query?
+                   (perform-remote-query (parse-query-remote query)))))
              (swap! dirty inc)))) 
